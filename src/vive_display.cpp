@@ -97,6 +97,7 @@ void ViveDisplay::onInitialize()
 
 void ViveDisplay::update(float wall_dt, float ros_dr)
 {
+	std::cout << "Time: " << wall_dt;
 	handleInput();
 
 	Ogre::Camera *cam = _pDisplayContext->getViewManager()->getCurrent()->getCamera();
@@ -108,10 +109,11 @@ void ViveDisplay::update(float wall_dt, float ros_dr)
 
 	if (_steamVrPose[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid)
 	{
-		Ogre::Vector3 vivePos = _trackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].getTrans();
+		//Ogre::Vector3 vivePos = _trackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].getTrans();
 		Ogre::Quaternion viveOri = _trackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].extractQuaternion();
-		_pCameraNode->setPosition(vivePos);
-		_pCameraNode->setOrientation(ori);
+		//_pCameraNode->setPosition(-vivePos);
+		_pCameraNode->setOrientation(viveOri.Inverse());
+
 	}
 
     _pRenderTextures[0]->update(true);
@@ -124,6 +126,7 @@ void ViveDisplay::update(float wall_dt, float ros_dr)
 		vr::Texture_t rightEyeTexture = {(void*)_pRenderTexutresId[1], vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
 		vr::VRCompositor()->Submit(vr::Eye_Right, &rightEyeTexture, &GLBounds);
     }
+
 }
 
 void ViveDisplay::reset()

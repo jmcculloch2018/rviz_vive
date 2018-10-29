@@ -27,7 +27,7 @@ cmake_minimum_required(VERSION 3.1.0)
 project(rviz_vive)
 
 ##Hardcoded OpenVR Path please change
-set(OPENVR "~/agn/openvr")
+set(OPENVR "~/openvr")
 include_directories("${OPENVR}/headers")
 link_directories("${OPENVR}/lib/linux64")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 ")
