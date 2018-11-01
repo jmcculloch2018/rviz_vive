@@ -81,11 +81,16 @@ void ViveDisplay::onInitialize()
 		_pHMD->GetProjectionMatrix(vr::Eye_Left, 0.01, 100),
 		_pHMD->GetProjectionMatrix(vr::Eye_Right, 0.01, 100)};
 
+	vr::HmdMatrix34_t e2hTransform[2] = {
+		_pHMD->GetEyeToHeadTransform(vr::Eye_Left),
+		_pHMD->GetEyeToHeadTransform(vr::Eye_Right),
+	};
+
     for (int i = 0; i < 2; ++i)
 	{
 		_pCameras[i]->detachFromParent();
 		_pCameraNode->attachObject(_pCameras[i]);
-
+		_pCameras[i]->setPosition(MatSteamVRtoOgre4(e2hTransform[i]).inverse().getTrans());
 		_pCameras[i]->setCustomProjectionMatrix(true, MatSteamVRtoOgre4(prj[i]));
 
         _ports[i] = _pRenderTextures[i]->addViewport(_pCameras[i]);
@@ -97,7 +102,6 @@ void ViveDisplay::onInitialize()
 
 void ViveDisplay::update(float wall_dt, float ros_dr)
 {
-	std::cout << "Time: " << wall_dt;
 	handleInput();
 
 	Ogre::Camera *cam = _pDisplayContext->getViewManager()->getCurrent()->getCamera();
@@ -109,10 +113,10 @@ void ViveDisplay::update(float wall_dt, float ros_dr)
 
 	if (_steamVrPose[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid)
 	{
-		//Ogre::Vector3 vivePos = _trackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].getTrans();
+		Ogre::Vector3 vivePos = _trackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].getTrans();
 		Ogre::Quaternion viveOri = _trackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].extractQuaternion();
-		//_pCameraNode->setPosition(-vivePos);
-		_pCameraNode->setOrientation(viveOri.Inverse());
+		_pCameraNode->setPosition(vivePos);
+		_pCameraNode->setOrientation(viveOri);
 
 	}
 
@@ -162,7 +166,7 @@ void ViveDisplay::handleInput()
 	{
 		if (_steamVrPose[nDevice].bPoseIsValid)
 		{
-			_trackedDevicePose[nDevice] = MatSteamVRtoOgre4(_steamVrPose[nDevice].mDeviceToAbsoluteTracking).inverse();
+			_trackedDevicePose[nDevice] = MatSteamVRtoOgre4(_steamVrPose[nDevice].mDeviceToAbsoluteTracking);
 		}
 	}
 }
