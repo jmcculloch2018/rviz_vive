@@ -16,6 +16,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <OGRE/RenderSystems/GL/OgreGLTexture.h>
 
 #include <openvr.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <rviz/properties/bool_property.h>
+#include <std_msgs/String.h>
 
 namespace rviz_vive
 {
@@ -31,6 +34,8 @@ public:
     virtual void update(float wall_dt, float ros_dt);
     virtual void reset();
 private:
+    rviz::BoolProperty *_horizontalProperty;
+
     Ogre::Matrix4 MatSteamVRtoOgre4(vr::HmdMatrix34_t matrix);
 	Ogre::Matrix4 MatSteamVRtoOgre4(vr::HmdMatrix44_t matrix);
 
@@ -53,6 +58,10 @@ private:
 
     vr::TrackedDevicePose_t _steamVrPose[vr::k_unMaxTrackedDeviceCount];
     Ogre::Matrix4 _trackedDevicePose[vr::k_unMaxTrackedDeviceCount];
+
+    tf2_ros::TransformBroadcaster _broadcaster;
+
+    ros::Publisher _update_pub;
 };
 
 };

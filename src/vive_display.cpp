@@ -10,6 +10,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 #include <rviz/display_context.h>
 #include <rviz/view_manager.h>
+#include <rviz/properties/bool_property.h>
+
+#include <tf2_ros/transform_broadcaster.h>
+#include <std_msgs/String.h>
 
 #include <OGRE/OgreRoot.h>
 
@@ -90,7 +94,7 @@ void ViveDisplay::onInitialize()
 	{
 		_pCameras[i]->detachFromParent();
 		_pCameraNode->attachObject(_pCameras[i]);
-		_pCameras[i]->setPosition(MatSteamVRtoOgre4(e2hTransform[i]).inverse().getTrans());
+		_pCameras[i]->setPosition(MatSteamVRtoOgre4(e2hTransform[i]).getTrans());
 		_pCameras[i]->setCustomProjectionMatrix(true, MatSteamVRtoOgre4(prj[i]));
 
         _ports[i] = _pRenderTextures[i]->addViewport(_pCameras[i]);
@@ -98,6 +102,13 @@ void ViveDisplay::onInitialize()
 		_ports[i]->setBackgroundColour(Ogre::ColourValue::Black);
         _ports[i]->setOverlaysEnabled(false);
 	}
+
+	// Set up properties
+	_horizontalProperty = new rviz::BoolProperty( "Fixed Horizon", true, "If checked, will ignore the pitch component of the RViz camera.", this);
+
+	// set up publisher
+	_update_pub = update_nh_.advertise<std_msgs::String>("viveUpdate", 1000);
+
 }
 
 void ViveDisplay::update(float wall_dt, float ros_dr)
@@ -107,6 +118,18 @@ void ViveDisplay::update(float wall_dt, float ros_dr)
 	Ogre::Camera *cam = _pDisplayContext->getViewManager()->getCurrent()->getCamera();
 	Ogre::Vector3 pos = cam->getDerivedPosition();
 	Ogre::Quaternion ori = cam->getDerivedOrientation();
+
+	if (_horizontalProperty->getBool()) {
+		Ogre::Vector3 x_axis = ori * Ogre::Vector3(1,0,0);
+	    float yaw = atan2( x_axis.y, x_axis.x );// - M_PI*0.5;
+
+	    // we're working in OpenGL coordinates now
+	    ori.FromAngleAxis( Ogre::Radian(yaw), Ogre::Vector3::UNIT_Z );
+
+	    Ogre::Quaternion r;
+	    r.FromAngleAxis( Ogre::Radian(M_PI*0.5), Ogre::Vector3::UNIT_X );
+		ori = ori * r;
+	}
 	
 	_pSceneNode->setOrientation(ori);
 	_pSceneNode->setPosition(pos);
@@ -131,6 +154,29 @@ void ViveDisplay::update(float wall_dt, float ros_dr)
 		vr::VRCompositor()->Submit(vr::Eye_Right, &rightEyeTexture, &GLBounds);
     }
 
+    // publish base transform to ros topic
+    
+    geometry_msgs::TransformStamped msg;
+    
+    msg.header.stamp = ros::Time::now();
+    msg.header.frame_id = "base";
+    msg.child_frame_id = "world";
+    
+    msg.transform.translation.x = pos.x;
+    msg.transform.translation.y = pos.y;
+    msg.transform.translation.z = pos.z;
+    
+    msg.transform.rotation.w = ori.w;
+    msg.transform.rotation.x = ori.x;
+    msg.transform.rotation.y = ori.y;
+    msg.transform.rotation.z = ori.z;
+	
+	_broadcaster.sendTransform(msg);
+
+	// publish message so we know update frequency
+	std_msgs::String strMsg;
+  	strMsg.data = "update";
+  	_update_pub.publish(strMsg);
 }
 
 void ViveDisplay::reset()
