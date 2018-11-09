@@ -35,10 +35,14 @@ public:
     virtual void reset();
 private:
     rviz::BoolProperty *_horizontalProperty;
+    rviz::BoolProperty *_callibrateProperty;
 
     Ogre::Matrix4 MatSteamVRtoOgre4(vr::HmdMatrix34_t matrix);
 	Ogre::Matrix4 MatSteamVRtoOgre4(vr::HmdMatrix44_t matrix);
-
+    
+    // ignores pitch / roll
+    Ogre::Matrix4 MakeTransformHorizontal(Ogre::Matrix4 mat); 
+    Ogre::Quaternion MakeQuaternionHorizontal(Ogre::Quaternion ori); 
     void handleInput();
 
    	vr::IVRSystem* _pHMD;
@@ -46,6 +50,9 @@ private:
 	rviz::DisplayContext* _pDisplayContext;
    	Ogre::SceneManager* _pSceneManager;
 
+    // position of HMD when cal was last pressed
+    Ogre::Vector3 _hmdCalPos; 
+    
     Ogre::Camera* _pCameras[2];
     Ogre::SceneNode* _pSceneNode;
     Ogre::SceneNode* _pCameraNode;

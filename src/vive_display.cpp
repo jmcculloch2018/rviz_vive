@@ -105,35 +105,43 @@ void ViveDisplay::onInitialize()
 
 	// Set up properties
 	_horizontalProperty = new rviz::BoolProperty( "Fixed Horizon", true, "If checked, will ignore the pitch component of the RViz camera.", this);
+	_callibrateProperty = new rviz::BoolProperty( "Callbirate", false, "If checked, will reset view in vive to match rviz camera position", this);
 
 	// set up publisher
 	_update_pub = update_nh_.advertise<std_msgs::String>("viveUpdate", 1000);
 
+	_hmdCalPos = Ogre::Vector3::ZERO;
+
 }
 
-void ViveDisplay::update(float wall_dt, float ros_dr)
-{
+void ViveDisplay::update(float wall_dt, float ros_dr) {
+	// wait for new vive data
 	handleInput();
 
+	// get position of camera
 	Ogre::Camera *cam = _pDisplayContext->getViewManager()->getCurrent()->getCamera();
 	Ogre::Vector3 pos = cam->getDerivedPosition();
 	Ogre::Quaternion ori = cam->getDerivedOrientation();
 
+	// ignore every component except yaw if horizontal checked
 	if (_horizontalProperty->getBool()) {
-		Ogre::Vector3 x_axis = ori * Ogre::Vector3(1,0,0);
-	    float yaw = atan2( x_axis.y, x_axis.x );// - M_PI*0.5;
-
-	    // we're working in OpenGL coordinates now
-	    ori.FromAngleAxis( Ogre::Radian(yaw), Ogre::Vector3::UNIT_Z );
-
-	    Ogre::Quaternion r;
-	    r.FromAngleAxis( Ogre::Radian(M_PI*0.5), Ogre::Vector3::UNIT_X );
-		ori = ori * r;
+		ori = MakeQuaternionHorizontal(ori);
 	}
-	
-	_pSceneNode->setOrientation(ori);
-	_pSceneNode->setPosition(pos);
 
+	// if callibrate checked store hmd position
+	if (_callibrateProperty->getBool() && 
+		_steamVrPose[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid) {
+		_hmdCalPos = _trackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].getTrans();
+		_callibrateProperty->setBool(false);
+	}
+
+	pos = pos - ori * _hmdCalPos; // adjust for hmd position so when callibrate head is at camera position
+
+	// set scene node position (base of vr world frame)
+	_pSceneNode->setPosition(pos);
+	_pSceneNode->setOrientation(ori);
+
+	// set camera position based on hmd pose
 	if (_steamVrPose[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid)
 	{
 		Ogre::Vector3 vivePos = _trackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].getTrans();
@@ -143,9 +151,11 @@ void ViveDisplay::update(float wall_dt, float ros_dr)
 
 	}
 
+	// update cameras
     _pRenderTextures[0]->update(true);
     _pRenderTextures[1]->update(true);
 
+    // send images to vive
 	if (_pHMD) 
 	{
 		vr::Texture_t leftEyeTexture = {(void*)_pRenderTexutresId[0], vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
@@ -202,6 +212,43 @@ Ogre::Matrix4 ViveDisplay::MatSteamVRtoOgre4(vr::HmdMatrix44_t matrix)
 		matrix.m[2][0], matrix.m[2][1], matrix.m[2][2], matrix.m[2][3],
 		matrix.m[3][0], matrix.m[3][1], matrix.m[3][2], matrix.m[3][3]
 		);
+}
+
+// ignores pitch / roll
+Ogre::Matrix4 ViveDisplay::MakeTransformHorizontal(Ogre::Matrix4 mat) {
+	// extract trans and quat
+	Ogre::Vector3 trans = mat.getTrans();
+	Ogre::Quaternion ori = mat.extractQuaternion();
+
+	// transform x_axis by quat to get its yaw
+	Ogre::Vector3 x_axis = ori * Ogre::Vector3(1,0,0);
+	float yaw = atan2( x_axis.y, x_axis.x );// - M_PI*0.5;
+
+	// we're working in OpenGL coordinates now
+	ori.FromAngleAxis( Ogre::Radian(yaw), Ogre::Vector3::UNIT_X );
+	Ogre::Quaternion r;
+	r.FromAngleAxis( Ogre::Radian(M_PI*0.5), Ogre::Vector3::UNIT_X );
+	// ori = ori * r;
+
+	//reconstruct matrix
+	mat.makeTransform(trans, Ogre::Vector3(1, 1, 1), ori);
+	return mat;
+
+}
+
+Ogre::Quaternion ViveDisplay::MakeQuaternionHorizontal(Ogre::Quaternion ori) {
+	// transform x_axis by quat to get its yaw
+	Ogre::Vector3 x_axis = ori * Ogre::Vector3(1,0,0);
+	float yaw = atan2( x_axis.y, x_axis.x );// - M_PI*0.5;
+
+	// we're working in OpenGL coordinates now
+	ori.FromAngleAxis( Ogre::Radian(yaw), Ogre::Vector3::UNIT_Z );
+	Ogre::Quaternion r;
+	r.FromAngleAxis( Ogre::Radian(M_PI*0.5), Ogre::Vector3::UNIT_X );
+	ori = ori * r;
+
+	return ori;
+
 }
 
 void ViveDisplay::handleInput()
