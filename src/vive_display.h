@@ -18,6 +18,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <openvr.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <rviz/properties/bool_property.h>
+#include <rviz/properties/string_property.h>
+
 #include <std_msgs/String.h>
 
 namespace rviz_vive
@@ -36,6 +38,7 @@ public:
 private:
     rviz::BoolProperty *_horizontalProperty;
     rviz::BoolProperty *_callibrateProperty;
+    rviz::BoolProperty *_callibrateProperty;
 
     Ogre::Matrix4 MatSteamVRtoOgre4(vr::HmdMatrix34_t matrix);
 	Ogre::Matrix4 MatSteamVRtoOgre4(vr::HmdMatrix44_t matrix);
@@ -44,6 +47,7 @@ private:
     Ogre::Matrix4 MakeTransformHorizontal(Ogre::Matrix4 mat); 
     Ogre::Quaternion MakeQuaternionHorizontal(Ogre::Quaternion ori); 
     void handleInput();
+    void rebroadcastPointCloud();
 
    	vr::IVRSystem* _pHMD;
 

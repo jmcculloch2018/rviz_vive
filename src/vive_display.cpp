@@ -105,8 +105,13 @@ void ViveDisplay::onInitialize()
 
 	// Set up properties
 	_horizontalProperty = new rviz::BoolProperty( "Fixed Horizon", true, "If checked, will ignore the pitch component of the RViz camera.", this);
-	_callibrateProperty = new rviz::BoolProperty( "Callbirate", false, "If checked, will reset view in vive to match rviz camera position", this);
+	_callibrateProperty = new rviz::BoolProperty( "Calibrate", false, "If checked, will reset view in vive to match rviz camera position", this);
+	_inputTopicProperty = new rviz::ROSTopicStringProperty( "Input PointCloud Topic", "", "POINT_CLOUD_MESSAGE_TYPE", 
+		"Topic on which rgbd point cloud is published", this);
+	_outputTopicProperty = new rviz::ROSTopicStringProperty( "Input PointCloud Topic", "", "POINT_CLOUD_MESSAGE_TYPE", 
+		"Topic on which rgbd point cloud is published", this);
 
+	_stringProperty = new rviz::StringProperty( "Point Cloud Input Channel")
 	// set up publisher
 	_update_pub = update_nh_.advertise<std_msgs::String>("viveUpdate", 1000);
 
