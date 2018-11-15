@@ -19,8 +19,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <tf2_ros/transform_broadcaster.h>
 #include <rviz/properties/bool_property.h>
 #include <rviz/properties/string_property.h>
+#include <rviz/properties/ros_topic_property.h>
 
 #include <std_msgs/String.h>
+#include <sensor_msgs/PointCloud2.h>
+
 
 namespace rviz_vive
 {
@@ -35,19 +38,30 @@ public:
     virtual void onInitialize();
     virtual void update(float wall_dt, float ros_dt);
     virtual void reset();
+
+public Q_SLOTS:
+    void updateInputTopic();
+    void updateOutputTopic();
 private:
     rviz::BoolProperty *_horizontalProperty;
     rviz::BoolProperty *_callibrateProperty;
-    rviz::BoolProperty *_callibrateProperty;
+
+    // point cloud 
+    void recievePointCloud(const sensor_msgs::PointCloud2::ConstPtr& msg);
+    rviz::RosTopicProperty *_inputTopicProperty;
+    rviz::StringProperty *_outputTopicProperty;
+    bool _paused;
+    bool _lastPressed;
+    sensor_msgs::PointCloud2::ConstPtr _last_msg;
+
 
     Ogre::Matrix4 MatSteamVRtoOgre4(vr::HmdMatrix34_t matrix);
 	Ogre::Matrix4 MatSteamVRtoOgre4(vr::HmdMatrix44_t matrix);
-    
-    // ignores pitch / roll
-    Ogre::Matrix4 MakeTransformHorizontal(Ogre::Matrix4 mat); 
+    Ogre::Matrix4 MakeTransformHorizontal(Ogre::Matrix4 mat); // ignores pitch / roll
+ 
     Ogre::Quaternion MakeQuaternionHorizontal(Ogre::Quaternion ori); 
+
     void handleInput();
-    void rebroadcastPointCloud();
 
    	vr::IVRSystem* _pHMD;
 
@@ -73,6 +87,9 @@ private:
     tf2_ros::TransformBroadcaster _broadcaster;
 
     ros::Publisher _update_pub;
+    ros::Subscriber _point_cloud_sub;
+    ros::Publisher _point_cloud_pub;
+
 };
 
 };

@@ -11,7 +11,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <rviz/display_context.h>
 #include <rviz/view_manager.h>
 #include <rviz/properties/bool_property.h>
+#include <rviz/properties/string_property.h>
+#include <rviz/properties/ros_topic_property.h>
 
+#include <sensor_msgs/PointCloud2.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <std_msgs/String.h>
 
@@ -104,18 +107,30 @@ void ViveDisplay::onInitialize()
 	}
 
 	// Set up properties
-	_horizontalProperty = new rviz::BoolProperty( "Fixed Horizon", true, "If checked, will ignore the pitch component of the RViz camera.", this);
-	_callibrateProperty = new rviz::BoolProperty( "Calibrate", false, "If checked, will reset view in vive to match rviz camera position", this);
-	_inputTopicProperty = new rviz::ROSTopicStringProperty( "Input PointCloud Topic", "", "POINT_CLOUD_MESSAGE_TYPE", 
-		"Topic on which rgbd point cloud is published", this);
-	_outputTopicProperty = new rviz::ROSTopicStringProperty( "Input PointCloud Topic", "", "POINT_CLOUD_MESSAGE_TYPE", 
-		"Topic on which rgbd point cloud is published", this);
+	_horizontalProperty = new rviz::BoolProperty( "Fixed Horizon", true, 
+		"If checked, will ignore the pitch component of the RViz camera.", this);
+	_callibrateProperty = new rviz::BoolProperty( "Calibrate", false, 
+		"If checked, will reset view in vive to match rviz camera position", this);
 
-	_stringProperty = new rviz::StringProperty( "Point Cloud Input Channel")
+	// play / pause point clouds
+	_inputTopicProperty = new rviz::RosTopicProperty( "Input PointCloud Topic", "", 
+		"sensor_msgs/PointCloud2", "Topic on which rgbd point cloud is published", this,
+		SLOT(updateInputTopic()), this);
+	_outputTopicProperty = new rviz::StringProperty( "Output PointCloud Topic", "", 
+		"Topic to publish play / pause point cloud", this, 
+		SLOT(updateOutputTopic()), this);
+	_point_cloud_pub = threaded_nh_.advertise<sensor_msgs::PointCloud2>(
+		_outputTopicProperty->getString().toUtf8().constData(), 1000);
+	_point_cloud_sub = threaded_nh_.subscribe<sensor_msgs::PointCloud2>(
+		_inputTopicProperty->getTopic().toUtf8().constData(), 1000, 
+		&ViveDisplay::recievePointCloud, this);
+
+
 	// set up publisher
 	_update_pub = update_nh_.advertise<std_msgs::String>("viveUpdate", 1000);
 
 	_hmdCalPos = Ogre::Vector3::ZERO;
+	_paused = false;
 
 }
 
@@ -187,6 +202,24 @@ void ViveDisplay::update(float wall_dt, float ros_dr) {
     msg.transform.rotation.z = ori.z;
 	
 	_broadcaster.sendTransform(msg);
+
+	vr::VRControllerState_t state;
+    for (vr::TrackedDeviceIndex_t i = 0; i < vr::k_unMaxTrackedDeviceCount; ++i) {
+    	if (_pHMD->GetTrackedDeviceClass(i) == vr::TrackedDeviceClass_Controller &&
+    		_pHMD->GetControllerRoleForTrackedDeviceIndex(i) == vr::TrackedControllerRole_RightHand &&
+    		_pHMD->GetControllerState(i, &state, sizeof(state))) {
+
+    		bool pressed = state.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu);
+    		if (pressed && !_lastPressed) {
+    			_paused = !_paused;
+    			ROS_INFO_STREAM("Paused: " << _paused);
+    		}
+    		_lastPressed = pressed;
+
+    		break;
+    	}
+    }
+
 
 	// publish message so we know update frequency
 	std_msgs::String strMsg;
@@ -268,6 +301,26 @@ void ViveDisplay::handleInput()
 		}
 	}
 }
+
+// point cloud
+void ViveDisplay::updateInputTopic() {
+	_point_cloud_sub = threaded_nh_.subscribe<sensor_msgs::PointCloud2>(
+		_inputTopicProperty->getTopic().toUtf8().constData(), 1000, &ViveDisplay::recievePointCloud, this);
+}
+
+void ViveDisplay::updateOutputTopic() {
+	_point_cloud_pub = threaded_nh_.advertise<sensor_msgs::PointCloud2>(
+		_outputTopicProperty->getString().toUtf8().constData(), 1000);
+}
+
+void ViveDisplay::recievePointCloud(const sensor_msgs::PointCloud2::ConstPtr& msg) {
+	if (!_paused || !_last_msg) {
+		_last_msg = msg;
+	}
+	_point_cloud_pub.publish(_last_msg);
+}
+
+
 
 };
 
